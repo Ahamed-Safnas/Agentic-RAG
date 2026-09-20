@@ -15,7 +15,13 @@ class Settings:
 
     # --- REASONING ENGINE (GROQ) ---
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = "openai/gpt-oss-20b"
+    GROQ_MODEL = "qwen/qwen3.8-27b"
     GROQ_FALLBACK_API_KEY = os.getenv("GROQ_FALLBACK_API_KEY")
+
+    # --- LLM GATEWAY (PORTKEY) ---
+    PORTKEY_API_KEY = os.getenv("PORTKEY_API_KEY")
+    GROQ_SLUG =  "rag"     # primary
+    GROQ_SLUG_2 = "llm1"  # fallback
+    PORTKEY_CONFIG_ID = os.getenv("PORTKEY_CONFIG_ID")
 
 settings = Settings()
