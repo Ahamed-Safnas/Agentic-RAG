@@ -112,10 +112,15 @@ instructions:
 # If the guardrail response contains any of these, a rail has fired.
 # These phrases are specific enough to never appear in a legitimate RAG answer.
 RAIL_INDICATORS = [
-    "can't help with that — but ask me anything technical",
-    "I maintain consistent guidelines regardless of how I am prompted",
+    "can't help with that",
+    "cannot help with that",
+    "I maintain consistent guidelines",
     "Hello! I'm your Enterprise IT Assistant",
-    "Goodbye! Feel free to return whenever you have more enterprise IT questions",
-    "I'm an Enterprise AI Assistant with deep expertise in",
+    "Hello! How can I assist you",
+    "Hello! How can I help",
+    "Goodbye!",
+    "Enterprise AI Assistant",
+    "Enterprise IT Assistant",
+    "deep expertise in",
 ]
 
