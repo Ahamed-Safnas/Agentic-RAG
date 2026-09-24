@@ -1,25 +1,22 @@
 import logfire
-from langchain_groq import ChatGroq
 from nemoguardrails import RailsConfig, LLMRails
 
-from app.config import settings
+from app.gateway import get_langchain_llm
 from app.guardrails.colang_rules import COLANG_CONTENT, YAML_CONTENT, RAIL_INDICATORS
-
+from app.config import settings
 
 _rails: LLMRails | None = None
 
 
 def initialize_rails() -> None:
     """
-    Build the NeMo LLMRails singleton at app startup.
-    Uses openai/gpt-oss-20b intent classification at the gate.
+    Build the NeMo LLMRails singleton at app startup using the Portkey LLM Gateway.
     """
     global _rails
 
-    guard_llm = ChatGroq(
-        api_key=settings.GROQ_API_KEY,
-        model=settings.GROQ_MODEL,
-        temperature=0
+    guard_llm = get_langchain_llm(
+        feature="guardrails", 
+        model=f"@{settings.GROQ_SLUG}/{settings.GROQ_MODEL}"
     )
 
     config = RailsConfig.from_content(
@@ -28,7 +25,7 @@ def initialize_rails() -> None:
     )
 
     _rails = LLMRails(config, llm=guard_llm)
-    logfire.info(f"🛡️ NeMo Guardrails initialised ({settings.GROQ_MODEL}).")
+    logfire.info("🛡️ NeMo Guardrails initialised via Portkey Gateway.")
     
     
 

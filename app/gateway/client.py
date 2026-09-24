@@ -6,31 +6,34 @@ from app.config import settings
 
 # 1. Store the Config ID string instead of an inline dictionary
 # (You can also add PORTKEY_CONFIG_ID to your settings.py)
-PORTKEY_CONFIG_ID = settings.PORTKEY_CONFIG_ID  # e.g., "pc-my-fallback-config-1234"
+# PORTKEY_CONFIG_ID = settings.PORTKEY_CONFIG_ID  # e.g., "pc-my-fallback-config-1234"
 
 portkey_client = Portkey(
     api_key=settings.PORTKEY_API_KEY,
-    config=PORTKEY_CONFIG_ID  # 👈 Pass the string ID
+    config=settings.PORTKEY_CONFIG_ID  # 👈 Pass the string ID
 )
 
 
-def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
+def get_langchain_llm(
+    model: str,
+    temperature: float = 0,
+    feature: str = "rag",
+) -> ChatOpenAI:
     return ChatOpenAI(
         api_key=settings.PORTKEY_API_KEY,
         base_url=PORTKEY_GATEWAY_URL,
-        model=f"@{settings.GROQ_SLUG}/openai/gpt-oss-20b",
-        temperature=0,
+        model=model,
+        temperature=temperature,
         default_headers=createHeaders(
             api_key=settings.PORTKEY_API_KEY,
-            config=PORTKEY_CONFIG_ID,  # 👈 Pass the string ID here instead of dictionary
+            config=settings.PORTKEY_CONFIG_ID,
             metadata={
                 "feature": feature,
                 "_user": "rag-system",
-                "environment": "production"
-            }
-        )
+                "environment": "production",
+            },
+        ),
     )
-
 def extract_cache_status(response) -> str:
     for attr in ("_raw_response", "_response", "_http_response"):
         raw = getattr(response, attr, None)
