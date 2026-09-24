@@ -5,20 +5,21 @@ Captures: actual_response (truncated to 300 chars), actual_contexts (from source
 and actual_tools_called (detected from thought_process).
 """
 
-
-import time
 import copy
 import json
 import os
-import requests
+import time
+
 import logfire
+import requests
 
 API_URL = "http://localhost:8000/query"
+STATUS_URL_TEMPLATE = "http://localhost:8000/query/status/{job_id}"
 RESPONSE_TRUNCATE = 300
-DELAY_BETWEEN_CALLS = 10   # seconds — stays within Groq RPM on the main key
-REQUEST_TIMEOUT = 120      # seconds — guardrails + LangGraph + Groq can take >60s
-
-
+DELAY_BETWEEN_CALLS = 10  # seconds — stays within Groq RPM on the main key
+REQUEST_TIMEOUT = 120  # seconds — guardrails + LangGraph + Groq can take >60s
+POLL_INTERVAL = 3  # seconds between job status polls
+MAX_POLL_ATTEMPTS = 60  # ~3 minutes max wait per sample
 
 
 def detect_tool(thought_process: list) -> str:
@@ -36,6 +37,47 @@ def detect_tool(thought_process: list) -> str:
     if "conversational" in joined or "memory" in joined:
         return "direct_answer"
     return "unknown"
+
+
+def _poll_for_result(job_id: str) -> dict:
+    """Poll /query/status until the Celery job completes or times out."""
+    url = STATUS_URL_TEMPLATE.format(job_id=job_id)
+    for attempt in range(MAX_POLL_ATTEMPTS):
+        with logfire.span("🔄 Eval polling job", job_id=job_id, attempt=attempt + 1):
+            resp = requests.get(url, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+
+        status = data.get("status", "UNKNOWN")
+        if status == "SUCCESS":
+            return data.get("result", {})
+        if status == "FAILURE":
+            error = data.get("error", "unknown failure")
+            raise RuntimeError(f"RAG job failed: {error}")
+        time.sleep(POLL_INTERVAL)
+
+    raise RuntimeError(f"Polling timed out for job {job_id}")
+
+
+def _fetch_query_result(question: str, thread_id: str) -> dict:
+    """Submit a query and return the final result (handling sync block + async jobs)."""
+    resp = requests.post(
+        API_URL,
+        json={"q": question, "thread_id": thread_id},
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Guardrails can block synchronously without creating a job.
+    if data.get("status") == "Blocked by guardrails." or "answer" in data:
+        return data
+
+    job_id = data.get("job_id")
+    if not job_id:
+        raise RuntimeError(f"Unexpected /query response: {data}")
+
+    return _poll_for_result(job_id)
 
 
 def run_pipeline(golden_dataset: dict, progress_callback=None) -> dict:
@@ -61,13 +103,7 @@ def run_pipeline(golden_dataset: dict, progress_callback=None) -> dict:
                 domain=sample.get("domain", ""),
             ):
                 try:
-                    resp = requests.post(
-                        API_URL,
-                        json={"q": question, "thread_id": f"eval_run_{i}"},
-                        timeout=REQUEST_TIMEOUT,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
+                    data = _fetch_query_result(question, thread_id=f"eval_run_{i}")
 
                     raw_answer = data.get("answer") or ""
                     thought_process = data.get("thought_process") or []
@@ -108,8 +144,8 @@ def run_pipeline(golden_dataset: dict, progress_callback=None) -> dict:
 def save_results(dataset: dict, path: str) -> None:
     with open(path, "w") as f:
         json.dump(dataset, f, indent=2)
-        
-        
+
+
 def load_golden_dataset() -> dict:
     golden_path = os.path.join(os.path.dirname(__file__), "golden_dataset.json")
     with open(golden_path) as f:
