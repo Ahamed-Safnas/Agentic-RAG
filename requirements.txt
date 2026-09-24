@@ -25,9 +25,11 @@ langchain                   # Core LLM orchestration
 langgraph                   # State-machine logic for cyclic agent flows
 langchain-groq              # Integration for lightning-fast Llama 3.3 models
 langchain-google-vertexai   # Required shim for NeMo Guardrails internal import (no GCP credentials needed)
-langchain-community         # Community-contributed tools and loaders
+langchain-community  # Community-contributed tools and loaders (pinned <0.4.0 for ragas compatibility)
+# langchain-community<0.4.0
 langchain-openai            # OpenAI-compatible layer (used by Portkey gateway)
-pydantic>=2.0.0             # Data validation and settings management
+pydantic            # Data validation and settings management
+# pydantic>=2.0.0 
 
 # --- DATA INGESTION & DOCUMENT PARSING ---
 unstructured                # Base library for DOCX/PPTX partitioning
@@ -56,6 +58,8 @@ langfuse                    # Live production monitoring, tracing & user feedbac
 
 # --- EMBEDDINGS (SENTENCE TRANSFORMERS) ---
 sentence-transformers       # Used by FlashRank reranker internally
+
 langchain_google_genai
+
 
 langchain-google-vertexai
