@@ -1,13 +1,15 @@
 import logfire
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
+
 from app.agents.state import AgentState
-from app.gateway import portkey_client, extract_cache_status
+from app.config import settings
+from app.gateway import get_portkey_model, portkey_client
 
 
 def generate_node(state: AgentState):
     """
     Synthesizes a response using both Documentation Context AND Conversation History.
-    Uses the native Portkey client (not LangChain) so we can read the
-    x-portkey-cache-status response header and surface Cache: Hit in the UI.
+    Uses the native Portkey client (not LangChain) for the final response.
     """
     query = state["current_query"]
 
@@ -58,30 +60,33 @@ def generate_node(state: AgentState):
 
     with logfire.span("✍️ LLM Synthesis"):
         try:
-            response = portkey_client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
+            response = _generate_response(prompt)
             content = response.choices[0].message.content
-            cache_status = extract_cache_status(response)
-            is_cache_hit = cache_status == "HIT"
-
-            if is_cache_hit:
-                logfire.info("⚡ Gateway Cache Hit — response served from Portkey cache.")
-                plan_update = state["plan"] + ["Cache: Hit ⚡"]
-                status = "Cache hit — instant response."
-            else:
-                logfire.info("✅ Response synthesised via LLM.")
-                plan_update = state["plan"]
-                status = "Response generated."
+            logfire.info("✅ Response synthesised via LLM.")
+            plan_update = state["plan"]
+            status = "Response generated."
 
             return {
                 "final_answer": content,
                 "status": status,
                 "plan": plan_update,
-                "messages": [{"role": "assistant", "content": content}]
+                "messages": [{"role": "assistant", "content": content}],
             }
 
         except Exception as e:
-            logfire.error(f"LLM Generation failed: {e}")
+            logfire.error(f"LLM Generation failed after retries: {e}")
             raise e
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=5),
+    reraise=True,
+    before_sleep=before_sleep_log(logfire, "warning"),
+)
+def _generate_response(prompt: str):
+    """Call the LLM gateway with retry logic for transient failures."""
+    return portkey_client.chat.completions.create(
+        model=get_portkey_model("responder"),
+        messages=[{"role": "user", "content": prompt}],
+    )
