@@ -25,12 +25,12 @@ def create_checkpointer() -> BaseCheckpointSaver:
 
         pool = ConnectionPool(
             conninfo=settings.postgres_uri,
-            max_size=settings.MEMORY_CHECKPOINT_POOL_MAX_SIZE,
+            max_size=20,
             open=False,
-            timeout=settings.MEMORY_CHECKPOINT_TIMEOUT_SECONDS,
+            timeout=10,
             num_workers=3,
             check=ConnectionPool.check_connection,
-            max_idle=settings.MEMORY_CHECKPOINT_MAX_IDLE_SECONDS,
+            max_idle=240,
         )
         # Verify connectivity before committing to Postgres; otherwise the first
         # graph invocation will hang on connection retries.
@@ -44,9 +44,6 @@ def create_checkpointer() -> BaseCheckpointSaver:
             with PostgresSaver.from_conn_string(settings.postgres_uri) as setup_saver:
                 setup_saver.setup()
         except Exception as e:
-            if settings.MEMORY_REQUIRE_DURABLE_CHECKPOINTER:
-                pool.close()
-                raise RuntimeError(f"Durable memory checkpoint setup failed: {e}") from e
             logfire.warning(f"⚠️ Postgres checkpointer setup failed ({e}); falling back to MemorySaver.")
             pool.close()
             return MemorySaver()
@@ -55,8 +52,6 @@ def create_checkpointer() -> BaseCheckpointSaver:
         logfire.info("🗄️ Postgres checkpointer configured.")
         return checkpointer
     except Exception as e:
-        if settings.MEMORY_REQUIRE_DURABLE_CHECKPOINTER:
-            raise RuntimeError(f"Durable memory checkpointer unavailable: {e}") from e
         logfire.warning(
             f"⚠️ Postgres checkpointer unavailable ({e}); falling back to MemorySaver. "
             "Do not use MemorySaver in production — state is lost on restart."

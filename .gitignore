@@ -32,7 +32,8 @@ index.faiss
 metadata.pkl
 
 # Data
-
+processed_data/
+DATA\noisy_data
 
 # IDEs
 .vscode/
@@ -56,4 +57,6 @@ tenvv
 # Logs
 *.log
 
-processed_data/
+# Redis local dump
+dump.rdb
+
