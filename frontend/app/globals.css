@@ -1,0 +1,65 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body { background: #0b0d12; color: #eef1f7; }
+button, textarea { font: inherit; }
+button { cursor: pointer; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 280px 1fr; background: radial-gradient(circle at 65% 10%, #171d2a 0, #0b0d12 35%); }
+.sidebar { border-right: 1px solid #242936; padding: 22px 16px; display: flex; flex-direction: column; min-width: 0; background: rgba(9,11,16,.78); }
+.brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 24px; }
+.brand-mark, .hero-icon { display: grid; place-items: center; border-radius: 12px; background: #1d2636; }
+.brand-mark { width: 38px; height: 38px; }
+.brand strong, .brand span { display: block; }
+.brand span { color: #7e8798; font-size: 12px; margin-top: 2px; }
+.new-chat { width: 100%; border: 1px solid #303747; background: #171c27; color: #fff; border-radius: 10px; padding: 11px 12px; text-align: left; }
+.new-chat:hover { background: #202735; }
+.sidebar-label { color: #697386; text-transform: uppercase; font-size: 10px; letter-spacing: .12em; margin: 24px 8px 8px; }
+.thread-list { overflow: auto; display: grid; gap: 3px; }
+.thread { border: 0; background: transparent; color: #aab2c1; border-radius: 8px; padding: 10px; text-align: left; display: flex; gap: 8px; align-items: center; }
+.thread span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.thread small { color: #5e6879; }
+.thread:hover, .thread.active { background: #171c27; color: #f1f4f8; }
+.sidebar-footer { margin-top: auto; padding: 16px 8px 4px; color: #667184; font-size: 11px; line-height: 1.45; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6ee7a0; margin-right: 6px; }
+.chat-panel { min-width: 0; display: grid; grid-template-rows: auto 1fr auto auto; height: 100vh; }
+.chat-header { border-bottom: 1px solid #202530; padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.eyebrow { color: #758095; font-size: 10px; letter-spacing: .16em; font-weight: 700; }
+.chat-header h1 { font-size: 16px; margin: 5px 0 0; font-weight: 600; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-badge { border: 1px solid #2b3240; color: #8d97a8; border-radius: 999px; padding: 7px 10px; font-size: 11px; }
+.messages { overflow: auto; width: min(920px, 100%); margin: 0 auto; padding: 36px 24px 24px; }
+.empty-state { min-height: 55vh; display: grid; place-content: center; justify-items: center; text-align: center; color: #7d8799; }
+.hero-icon { width: 56px; height: 56px; font-size: 24px; margin-bottom: 16px; }
+.empty-state h2 { color: #e9edf4; font-size: 25px; margin: 0 0 8px; }
+.empty-state p { margin: 0; font-size: 14px; }
+.message { display: flex; gap: 12px; margin: 0 0 24px; align-items: flex-start; }
+.message.user { flex-direction: row-reverse; }
+.avatar { flex: 0 0 30px; height: 30px; border-radius: 9px; background: #1a202c; display: grid; place-items: center; color: #aeb8c8; font-size: 10px; font-weight: 700; }
+.bubble { max-width: min(760px, 82%); padding: 12px 15px; line-height: 1.65; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #242b38; background: #121720; border-radius: 12px; }
+.user .bubble { background: #1b2230; }
+.typing { display: flex; gap: 5px; padding: 16px; }
+.typing i { width: 5px; height: 5px; border-radius: 50%; background: #8791a3; animation: pulse 1s infinite ease-in-out; }
+.typing i:nth-child(2) { animation-delay: .15s; }.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes pulse { 0%, 100% { opacity: .25; transform: translateY(0) } 50% { opacity: 1; transform: translateY(-2px) } }
+.pipeline { margin: 4px 42px 24px; border: 1px solid #252c39; border-radius: 10px; color: #8f99aa; font-size: 12px; }
+.pipeline summary { cursor: pointer; padding: 10px 12px; color: #b7c0cf; }
+.pipeline > *:not(summary) { margin-left: 12px; margin-right: 12px; }
+.sources details { border-top: 1px solid #222936; padding: 8px 0; }
+.sources p { white-space: pre-wrap; line-height: 1.5; }
+.error { margin: 12px 42px; padding: 10px 12px; border: 1px solid #58353a; background: #24181b; color: #e6aab0; border-radius: 8px; }
+.composer { width: min(920px, calc(100% - 48px)); margin: 0 auto; display: flex; gap: 8px; padding: 14px; border: 1px solid #2a3140; background: #11151d; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.composer textarea { flex: 1; resize: none; max-height: 180px; min-height: 24px; background: transparent; border: 0; outline: 0; color: #edf1f7; line-height: 1.5; }
+.composer textarea::placeholder { color: #667184; }
+.composer button { width: 34px; height: 34px; border: 0; border-radius: 9px; background: #e9edf4; color: #0b0d12; font-size: 20px; align-self: end; }
+.composer button:disabled { opacity: .35; cursor: default; }
+.composer-note { width: min(920px, calc(100% - 48px)); margin: 0 auto; padding: 7px 0 14px; text-align: center; color: #4f5969; font-size: 10px; }
+@media (max-width: 760px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .chat-panel { height: 100dvh; }
+  .chat-header { padding: 14px 16px; }
+  .memory-badge { display: none; }
+  .messages { padding: 24px 14px 18px; }
+  .bubble { max-width: 88%; }
+  .pipeline, .error { margin-left: 42px; margin-right: 0; }
+  .composer { width: calc(100% - 24px); }
+  .composer-note { width: calc(100% - 24px); }
+}
