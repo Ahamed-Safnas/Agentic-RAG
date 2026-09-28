@@ -26,13 +26,16 @@ wheels/
 
 # Environment variables
 .env
+.venv
 
 # Local Vector Store
 index.faiss
 metadata.pkl
 
 # Data
-
+.DATA/
+frontend/node_modules
+frontend/.next
 
 # IDEs
 .vscode/
