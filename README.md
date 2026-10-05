@@ -1,24 +1,32 @@
-# Enterprise Agentic RAG (Scalable Pipeline)
+# Enterprise Agentic RAG
 
-A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **OpenAI**, and **Jina AI Embeddings/Reranker**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
+This repository is a working end-to-end RAG system for enterprise document search and answer generation. The current implementation uses a LangGraph workflow, a FastAPI backend, a Qdrant vector store, Jina embeddings + reranking, a Portkey LLM gateway, and Postgres-backed conversation memory.
 
-## Key Features
+## Key features
 
-- **Agentic Intelligence**: LangGraph for cyclic reasoning, multi-step planning, and conversation memory.
-- **Guardrails**: NeMo Guardrails gate blocks off-topic, jailbreak, and injection inputs before any retrieval.
-- **LLM Gateway**: Portkey routes all LLM calls with automatic fallback between OpenAI and Anthropic via your configured Portkey virtual providers.
-- **Enterprise Search**: Qdrant Cloud for high-performance vector search + Jina AI Reranker API for semantic reranking.
-- **Jina AI Embeddings**: `jina-embeddings-v3` (1024-dim) via Jina API, with local `mxbai-embed-large-v1` fallback.
-- **Local Document Parsing**: PDF, HTML, TXT, DOCX, PPTX parsed entirely on-device — no external OCR service.
-- **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every agent node.
-- **Metrics**: Prometheus `/metrics` endpoint with custom RAG and guardrails counters.
-- **Synchronous `/query`**: The LangGraph pipeline runs directly inside the `/query` endpoint and returns the final answer.
-- **API Key & Rate Limiting**: Optional bearer-token auth and Redis-backed (or in-memory) rate limiting.
-- **Evaluation Suite**: RAGAS-powered eval pipeline (6 metrics) with a dedicated Streamlit demo app and a headless `evals/run_evals.py` script.
+- Agentic workflow orchestration with LangGraph and planner/retriever/responder routing
+- Durable conversation memory using a Postgres-backed LangGraph checkpointer with MemorySaver fallback
+- Qdrant vector search with Jina embeddings and reranking for higher-quality citations
+- NeMo Guardrails integration to block unsafe or irrelevant requests before retrieval/generation
+- FastAPI backend with auth, rate limiting, Prometheus metrics, and health endpoints
+- Streamlit chat UI for direct interaction and thread browsing
+- Local ingestion pipeline for PDF, HTML, TXT, DOCX, and PPTX content
+- Observability through Logfire and LangSmith tracing
+- Built-in eval scripts for quality assessment with RAGAS
 
----
+## What the project does today
 
-## Agent Intelligence Flow
+- Processes local documents from `DATA/` and stores chunked metadata under `processed_data/`
+- Embeds and indexes content in Qdrant for semantic retrieval
+- Retrieves relevant chunks and reranks them before generation
+- Uses a LangGraph planner/retriever/responder flow to decide when the system needs retrieval vs. a direct answer
+- Persists conversation state with a Postgres checkpointer and falls back to in-memory memory only if Postgres is unavailable
+- Applies NeMo Guardrails before retrieval and generation
+- Serves the app through FastAPI and a Streamlit chat UI
+- Exposes metrics at `/metrics` and health checks through the app health router
+- Includes an evaluation suite under `evals/` for RAGAS-based assessment
+
+## Current architecture
 
 ```mermaid
 graph TD
@@ -26,169 +34,219 @@ graph TD
     UI --> API[FastAPI /query]
     API --> Guard{NeMo Guardrails}
     Guard -->|Blocked| UI
-    Guard -->|Pass| Planner{Planner Node}
-    Planner -->|Conversational| Responder[Responder Node]
-    Planner -->|Technical| Retriever[Retriever Node]
-    Retriever --> Reranker[Jina AI Reranker API]
-    Reranker --> Responder
-    Responder --> UI
-    Responder -.-> Memory[(LangGraph MemorySaver)]
+    Guard -->|Passed| Planner{Planner node}
+    Planner -->|Conversational| Responder[Responder node]
+    Planner -->|Technical| Retriever[Retriever node]
+    Retriever --> Qdrant[Qdrant vector search]
+    Qdrant --> Rerank[Jina reranker]
+    Rerank --> Responder
+    Responder --> Memory[(Postgres checkpointer)]
 ```
 
----
+## Key implementation details
 
-## Project Structure
+- Backend entrypoint: `app/main.py`
+- Agent graph: `app/agents/graph.py`
+- Planner, retriever, and responder nodes: `app/agents/nodes/`
+- Model routing and gateway setup: `app/gateway/client.py`
+- Configuration and environment validation: `app/config.py`
+- Guardrails: `app/guardrails/`
+- Document ingestion and chunking: `app/ingestion/`
+- Retrieval and ranking: `app/services/retrieval/`
+- UI: `ui/app.py`
+- Evaluation scripts: `evals/`
+
+## Tech stack
+
+- API: FastAPI
+- Agent orchestration: LangGraph
+- LLM gateway: Portkey AI
+- Guardrails: NeMo Guardrails
+- Vector store: Qdrant
+- Embeddings: Jina `jina-embeddings-v3`
+- Reranking: Jina reranker API
+- Durable memory: Neon / Postgres via `langgraph-checkpoint-postgres`
+- Rate limiting / cache: Redis + Upstash REST
+- Observability: Pydantic Logfire + LangSmith
+- UI: Streamlit
+- Evaluation: RAGAS
+
+## Project structure
 
 ```text
+.
 ├── app/
 │   ├── agents/
-│   │   └── nodes/       # Planner, Retriever, Responder LangGraph nodes
-│   ├── gateway/         # Portkey LLM gateway — primary + fallback Groq routing
-│   ├── guardrails/      # NeMo Guardrails input/output filtering
+│   │   ├── nodes/
+│   │   ├── graph.py
+│   │   └── state.py
+│   ├── gateway/
+│   ├── guardrails/
 │   ├── ingestion/
-│   │   ├── chunking/    # Paragraph-based text splitter (1500 char max)
-│   │   └── loaders/     # Local parsers — PDF (pypdf), HTML, TXT, DOCX, PPTX
 │   ├── services/
-│   │   └── retrieval/   # Jina AI embeddings + Qdrant search + Jina AI reranking
-│   ├── config.py        # Centralized environment variable management
-│   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
-├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
-├── ui/                  # Streamlit chat interface with reasoning step transparency
-├── processed_data/      # Auto-generated — parsed & chunked JSON output per document
-├── DOCS/                # Architectural and operational guides
-├── DATA/                # Sample datasets (True vs Noisy documentation)
-├── Dockerfile           # Container definition (retained for reference)
-└── requirements.txt     # Pinned dependencies
+│   ├── config.py
+│   ├── health.py
+│   ├── logging.py
+│   └── main.py
+├── DATA/
+├── evals/
+├── processed_data/
+├── ui/
+├── .env.example
+├── pyproject.toml
+├── requirements.txt
+├── requirements-current.txt
+├── README.md
+├── workflow.md
+├── llm-workflow.md
+└── LICENSE
 ```
 
----
+## Local setup
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Orchestration | LangChain + LangGraph |
-| LLMs | OpenAI `gpt-5-mini` + Anthropic fallback via **Portkey** gateway |
-| Guardrails | NeMo Guardrails |
-| Vector DB | Qdrant Cloud |
-| Reranking | Jina AI Reranker API (`jina-reranker-v3`) |
-| Embeddings | Jina AI `jina-embeddings-v3` (1024-dim) + local mxbai fallback |
-| Document Parsing | pypdf + pdfplumber (local, no OCR service) |
-| Observability | Pydantic Logfire + LangSmith |
-| Evaluation | RAGAS + custom Tool Correctness (Jaccard) |
-
----
-
-## Getting Started
-
-### 1. Install dependencies
+### 1. Create a virtual environment and install dependencies
 
 ```powershell
-python -m venv tenvv
-.\tenvv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+If you prefer the package metadata flow instead of raw requirements, this repo also supports:
 
-Create a `.env` file with the following keys:
-
-```env
-# OpenAI LLM
-OPENAI_API_KEY = "..."
-
-# LLM Gateway
-PORTKEY_API_KEY = "..."
-
-# Jina AI Embeddings + Reranker API
-JINA_API_KEY = "..."
-
-# Vector DB
-QDRANT_API_KEY = "..."
-QDRANT_CLUSTER_ENDPOINT = "https://your-cluster.cloud.qdrant.io:6333"
-
-# Production persistence (Neon) & cache (Upstash Redis)
-NEON_DB_URL = "postgresql://user:password@host.neon.tech/enterprise_rag?sslmode=require"
-UPSTASH_REDIS_REST_URL = "https://your-db.upstash.io"
-UPSTASH_REDIS_REST_TOKEN = "your-upstash-token"
-
-# API safety
-RAG_API_KEY = ""                       # set in production to require bearer auth
-RATE_LIMIT_PER_MINUTE = 20
-
-# Observability
-LOGFIRE_TOKEN = "..."
-LANGSMITH_API_KEY = "..."
-LANGSMITH_PROJECT = "enterprise_rag"
-LANGSMITH_TRACING = true
-LANGSMITH_ENDPOINT = https://api.smith.langchain.com
-
-# Evals
-JUDGE_OPENAI_API_KEY = "..."
-
-# Backend (for Streamlit UI)
-BACKEND_URL = "http://localhost:8000"
+```powershell
+pip install -e .
 ```
 
-### 3. Run data ingestion
+### 2. Configure environment variables
 
-Parses all documents in `DATA/`, chunks them, saves metadata to `processed_data/`, and indexes vectors into Qdrant.
+Copy `.env.example` to `.env` and fill in the values for your environment.
+
+```env
+OPENAI_API_KEY=
+PORTKEY_API_KEY=
+PORTKEY_PRIMARY_SLUG=rag
+PORTKEY_FALLBACK_SLUG=llm1
+PORTKEY_PRIMARY_CONFIG_ID=
+PORTKEY_PLANNER_CONFIG_ID=
+PORTKEY_RESPONDER_CONFIG_ID=
+PORTKEY_GUARDRAILS_CONFIG_ID=
+PORTKEY_EVALS_CONFIG_ID=
+JINA_API_KEY=
+QDRANT_API_KEY=
+QDRANT_CLUSTER_ENDPOINT=
+NEON_DB_URL=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+RAG_API_KEY=
+RATE_LIMIT_PER_MINUTE=20
+LOGFIRE_TOKEN=
+LOGFIRE_BASE_URL=https://logfire-eu.pydantic.dev
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=rag_scale_test
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+BACKEND_URL=http://localhost:8000
+JUDGE_OPENAI_API_KEY=
+```
+
+Important notes:
+
+- This project expects real Portkey saved-config IDs such as `PORTKEY_PRIMARY_CONFIG_ID` and the optional feature-specific IDs in `.env`.
+- `QDRANT_URL` is also accepted as an alias for `QDRANT_CLUSTER_ENDPOINT` in configuration.
+- `app/config.py` treats empty `QDRANT_API_KEY` values as unset, which is useful for local or permissive Qdrant setups.
+- `MEMORY_REQUIRE_DURABLE_CHECKPOINTER` can be set to `true` to fail startup if Postgres-backed memory is unavailable.
+
+### 3. Verify external dependencies
+
+Before starting the backend, you can check connectivity and service health:
+
+```powershell
+python -m app.services.health.connection_checker
+```
+
+### 4. Start the backend
+
+```powershell
+uvicorn app.main:app --reload --port 8000
+```
+
+The API exposes:
+
+- `/` — service liveness message
+- `/query` — synchronous RAG request endpoint
+- `/memory/{thread_id}` — retrieve conversation memory for a thread
+- `/memory` — list recent threads
+- `/graph` — returns a Mermaid graph image
+- `/metrics` — Prometheus metrics
+
+### 5. Start the Streamlit UI
+
+```powershell
+streamlit run ui/app.py
+```
+
+The UI expects `BACKEND_URL` to point to the FastAPI server, which defaults to `http://localhost:8000`.
+
+## Ingest documents
+
+The ingestion pipeline parses local files from `DATA/`, chunks them, saves processed output under `processed_data/`, and indexes them into Qdrant.
 
 ```powershell
 python -m app.ingestion.processor DATA --wipe
 ```
 
-> Pass `--wipe` to drop and recreate the Qdrant collection. Omit it to append to an existing collection.
+- Use `--wipe` to recreate the Qdrant collection and refresh indexes.
+- Omit it to append to the existing collection.
 
-### 4. Launch the app
-
-The `/query` endpoint runs the LangGraph pipeline synchronously. You only need the FastAPI server and (optionally) the Streamlit UI. Redis and Postgres are managed by Upstash and Neon; no local persistence services are required.
-
-> **Tip:** You can verify all external connections before starting the server:
-> ```bash
-> python -m app.services.health.connection_checker
-> ```
+## Query the API
 
 ```powershell
-# Terminal 1 — FastAPI backend
-uvicorn app.main:app --reload --port 8000
-
-# Terminal 2 — Streamlit UI
-streamlit run ui/app.py
+curl -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"q":"How do I start Redis for a Kubernetes work queue?","thread_id":"user-1"}'
 ```
 
-### 5. Query the API
+A typical response looks like:
 
-```powershell
-curl -X POST "http://localhost:8000/query" `
-  -H "Content-Type: application/json" `
-  -d '{"q": "How do I start Redis for a Kubernetes work queue?", "thread_id": "user-1"}'
-
-# Response: {"question": "...", "answer": "...", "thought_process": [...], "status": "...", "sources": [...]}
+```json
+{
+  "question": "How do I start Redis for a Kubernetes work queue?",
+  "answer": "...",
+  "thought_process": ["..."],
+  "status": "success",
+  "sources": ["..."]
+}
 ```
 
-### 6. Run the eval suite
+## Run the eval suite
+
+The evaluation scripts live under `evals/` and can be run either headlessly or through the app UI.
 
 ```powershell
-# Headless CLI runner (requires backend on :8000)
 python -m evals.run_evals
+```
 
-# Or use the Streamlit demo
+Or start the demo UI:
+
+```powershell
 streamlit run evals/app.py
 ```
 
-### 7. Run tests locally
+## Notes and operational guidance
+
+- The project is designed for a durable Postgres checkpointer in production and falls back to `MemorySaver` only when Postgres is not reachable.
+- Redis is used for rate limiting and may fallback to in-memory storage if the Redis connection is unavailable.
+- `STRICT_STARTUP` in `app/config.py` can be enabled to fail startup when required dependencies are unhealthy.
+- Guardrails are initialized during app startup through `initialize_rails()` in `app.main`.
+- This repo includes both backend and UI components; if you only want to test the API, the UI can be skipped.
+
+## Development checks
 
 ```powershell
-# Lint + format checks
-ruff check app tests evals
-ruff format --check app tests evals
-
-# Unit tests
-$env:LOGFIRE_IGNORE_NO_CONFIG=1
-pytest tests/
+ruff check app evals ui
+ruff format --check app evals ui
+pytest
 ```
 
----
-
-*Built for High-Scale Enterprise Document Intelligence.*
+This project is configured for Python 3.11+ and is intended to be run from the repository root.

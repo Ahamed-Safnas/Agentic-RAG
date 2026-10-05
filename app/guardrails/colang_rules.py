@@ -98,19 +98,18 @@ define flow farewell
 """
 
 YAML_CONTENT = """
-models:
-  - type: main
-    engine: openai
-    model: gpt-3.5-turbo
-
 instructions:
   - type: general
     content: |
-      You are an Enterprise IT Assistant specialising in:
-      - Kubernetes (deployment, scaling, operators, networking)
-      - Intel hardware (CPUs, FPGAs, NICs, SRIOV)
-      - Enterprise networking (SDN, VLANs, BGP, routing)
+      You are the guardrails model for an Enterprise IT RAG assistant.
+      You are specialising in:
+            - Kubernetes (deployment, scaling, operators, networking)  
       Only answer questions about these topics. Be professional and concise.
+      Follow the configured Colang flows for off-topic requests, jailbreak
+      attempts, greetings, capability questions, and farewells. Use their
+      configured responses when a flow matches.
+      Do not answer technical questions yourself; the RAG pipeline generates
+      answers for requests that pass the guardrails. Be professional and concise.
 """
 
 # Distinctive substrings from each 'define bot' block above.

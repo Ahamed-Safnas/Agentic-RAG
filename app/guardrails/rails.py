@@ -11,7 +11,6 @@ _rails: LLMRails | None = None
 def initialize_rails() -> None:
     """
     Build the NeMo LLMRails singleton at app startup.
-    Uses OpenAI gpt-5-mini for fast intent classification at the gate.
     """
     global _rails
 
